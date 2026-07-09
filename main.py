@@ -28,7 +28,11 @@ def loop(task):
 
         if response.get("tool_calls"):
             for call in response["tool_calls"]:
-                args = json.loads(call["function"]["arguments"])
+                try:
+                    args = json.loads(call["function"]["arguments"])
+                except json.JSONDecodeError:
+                    messages.append({"role": "tool", "tool_call_id": call["id"], "content": "Error: invalid JSON in tool arguments"})
+                    continue
                 if call["function"]["name"] == "finish":
                     state = "done"
                     print(f"Finished: {args.get('summary', '(none)')}")
