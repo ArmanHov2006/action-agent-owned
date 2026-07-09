@@ -16,7 +16,7 @@
       "label": "ask()",
       "file_type": "code",
       "source_file": "llm.py",
-      "source_location": "L34",
+      "source_location": "L35",
       "id": "llm_ask",
       "community": 0,
       "norm_label": "ask()"
@@ -63,7 +63,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "llm.py",
-      "source_location": "L34",
+      "source_location": "L35",
       "weight": 1.0,
       "_src": "llm_py",
       "_tgt": "llm_ask",
