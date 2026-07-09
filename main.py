@@ -23,7 +23,12 @@ def loop(task):
     ]
 
     while i < MAX_STEPS and state != "done":
-        response = ask(messages)
+        try:
+            response = ask(messages)
+        except RuntimeError as e:
+            print(f"LLM call failed: {e}")
+            state = "error"
+            break
         messages.append(response)
 
         if response.get("tool_calls"):
@@ -48,12 +53,12 @@ def loop(task):
         else:
             print(f"Response: {response['content']}")
         i += 1
-
-    if state != "done":
+    if state == "error":
+        print("Aborted due to LLM error.")
+    elif state != "done":
         print("Max steps reached without completing the task.")
     else:
         print("Task completed successfully.")
-
 
 if __name__ == "__main__":
     loop("Fetch api.github.com with httpGet, tell me the page title, then call finish.")

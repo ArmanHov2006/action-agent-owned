@@ -46,4 +46,6 @@ def ask(messages):
     )
     data = response.json()
     print(json.dumps(data))
+    if response.status_code != 200 or "error" in data:
+        raise RuntimeError(f"LLM API error: {data.get('error', data)}")
     return data["choices"][0]["message"]
