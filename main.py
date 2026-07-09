@@ -29,14 +29,17 @@ def loop(task):
         if response.get("tool_calls"):
             for call in response["tool_calls"]:
                 args = json.loads(call["function"]["arguments"])
-
                 if call["function"]["name"] == "finish":
                     state = "done"
-                    print(f"Finished: {args['summary']}")
+                    print(f"Finished: {args.get('summary', '(none)')}")
                     break
-
                 fn = TOOLS.get(call["function"]["name"])
-                result = fn(args["url"]) if fn else f"Unknown tool: {call['function']['name']}"
+                if not fn:
+                    result = f"Unknown tool: {call['function']['name']}"
+                elif not args.get("url"):
+                    result = "Error: missing required argument 'url'"
+                else:
+                    result = fn(args["url"])
                 messages.append({"role": "tool", "tool_call_id": call["id"], "content": str(result)})
         else:
             print(f"Response: {response['content']}")
