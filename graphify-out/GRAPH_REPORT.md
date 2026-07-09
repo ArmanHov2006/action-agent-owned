@@ -1,7 +1,7 @@
 # Graph Report - .  (2026-07-09)
 
 ## Corpus Check
-- 3 files · ~264 words
+- 3 files · ~619 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -19,8 +19,8 @@
 2. `loop()` - 2 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `loop()` --calls--> `ask()`  [INFERRED]
-  main.py → llm.py
+- `ask()` --calls--> `loop()`  [INFERRED]
+  llm.py → main.py
 
 ## Communities
 

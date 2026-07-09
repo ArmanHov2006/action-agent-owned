@@ -78,8 +78,8 @@
       "source_file": "main.py",
       "source_location": "L26",
       "weight": 1.0,
-      "_src": "main_loop",
-      "_tgt": "llm_ask",
+      "_src": "llm_ask",
+      "_tgt": "main_loop",
       "source": "llm_ask",
       "target": "main_loop"
     },
