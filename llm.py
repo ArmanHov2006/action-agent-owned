@@ -32,18 +32,22 @@ TOOLS = [
 
 
 def ask(messages):
-    response = requests.post(
-        "https://api.openai.com/v1/chat/completions",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
-        },
-        json={
-            "model": "gpt-4o-mini",
-            "messages": messages,
-            "tools": TOOLS,
-        },
-    )
+    try:
+        response = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
+            },
+            json={
+                "model": "gpt-4o-mini",
+                "messages": messages,
+                "tools": TOOLS,
+            },
+            timeout=30,
+        )
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"LLM request failed: {e}")
     data = response.json()
     print(json.dumps(data))
     if response.status_code != 200 or "error" in data:
