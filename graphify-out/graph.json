@@ -1,0 +1,112 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "label": "llm.py",
+      "file_type": "code",
+      "source_file": "llm.py",
+      "source_location": "L1",
+      "id": "llm_py",
+      "community": 0,
+      "norm_label": "llm.py"
+    },
+    {
+      "label": "ask()",
+      "file_type": "code",
+      "source_file": "llm.py",
+      "source_location": "L34",
+      "id": "llm_ask",
+      "community": 0,
+      "norm_label": "ask()"
+    },
+    {
+      "label": "main.py",
+      "file_type": "code",
+      "source_file": "main.py",
+      "source_location": "L1",
+      "id": "main_py",
+      "community": 1,
+      "norm_label": "main.py"
+    },
+    {
+      "label": "loop()",
+      "file_type": "code",
+      "source_file": "main.py",
+      "source_location": "L14",
+      "id": "main_loop",
+      "community": 1,
+      "norm_label": "loop()"
+    },
+    {
+      "label": "tools.py",
+      "file_type": "code",
+      "source_file": "tools.py",
+      "source_location": "L1",
+      "id": "tools_py",
+      "community": 2,
+      "norm_label": "tools.py"
+    },
+    {
+      "label": "httpGet()",
+      "file_type": "code",
+      "source_file": "tools.py",
+      "source_location": "L4",
+      "id": "tools_httpget",
+      "community": 2,
+      "norm_label": "httpget()"
+    }
+  ],
+  "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "llm.py",
+      "source_location": "L34",
+      "weight": 1.0,
+      "_src": "llm_py",
+      "_tgt": "llm_ask",
+      "source": "llm_py",
+      "target": "llm_ask",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "main.py",
+      "source_location": "L26",
+      "weight": 1.0,
+      "_src": "main_loop",
+      "_tgt": "llm_ask",
+      "source": "llm_ask",
+      "target": "main_loop"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "main.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "_src": "main_py",
+      "_tgt": "main_loop",
+      "source": "main_py",
+      "target": "main_loop",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tools.py",
+      "source_location": "L4",
+      "weight": 1.0,
+      "_src": "tools_py",
+      "_tgt": "tools_httpget",
+      "source": "tools_py",
+      "target": "tools_httpget",
+      "confidence_score": 1.0
+    }
+  ],
+  "hyperedges": []
+}
