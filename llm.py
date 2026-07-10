@@ -29,6 +29,17 @@ TOOLS = [
             },
         },
     },
+        {"type": "function",
+         "function": {
+             "name": "askUser",
+             "description": "Ask the user a question and get their input.",
+             "parameters": {
+                 "type": "object",
+                 "properties": {"prompt": {"type": "string"}},
+                 "required": ["prompt"],
+             },
+         }
+    },
 ]
 
 

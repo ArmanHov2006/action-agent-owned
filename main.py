@@ -3,12 +3,12 @@ import json
 from dotenv import load_dotenv
 
 from llm import ask
-from tools import httpGet
+from tools import httpGet, askUser
 
 load_dotenv()
 
 MAX_STEPS = 20
-TOOLS = {"httpGet": httpGet}
+TOOLS = {"httpGet": httpGet, askUser.__name__: askUser}
 
 
 def loop(task):
@@ -45,10 +45,11 @@ def loop(task):
                 fn = TOOLS.get(call["function"]["name"])
                 if not fn:
                     result = f"Unknown tool: {call['function']['name']}"
-                elif not args.get("url"):
-                    result = "Error: missing required argument 'url'"
                 else:
-                    result = fn(args["url"])
+                    try:
+                        result = fn(**args)
+                    except Exception as e:
+                        result = f"Tool call error: {e}"
                 messages.append({"role": "tool", "tool_call_id": call["id"], "content": str(result)})
         else:
             print(f"Response: {response['content']}")
@@ -61,4 +62,4 @@ def loop(task):
         print("Task completed successfully.")
 
 if __name__ == "__main__":
-    loop("Fetch api.github.com with httpGet, tell me the page title, then call finish.")
+    loop("Ask me which GitHub username to look up. Then fetch https://api.github.com/users/ followed by that username, and tell me their name, bio, and public repo count, then finish.")

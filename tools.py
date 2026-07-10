@@ -8,3 +8,6 @@ def httpGet(url):
         return response.text
     except requests.exceptions.RequestException as e:
         return f"httpGet error: {e}"
+
+def askUser(prompt):
+    return input(prompt)
