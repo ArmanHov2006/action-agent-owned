@@ -68,7 +68,6 @@ def ask(messages, max_retries=3):
                 reason = f"HTTP {response.status_code}"
             else:
                 data = response.json()
-                print(json.dumps(data))
                 if response.status_code == 200 and "error" not in data:
                     return data["choices"][0]["message"]
                 # Permanent failure (401 bad key, 400 bad request, ...): retry is pointless.

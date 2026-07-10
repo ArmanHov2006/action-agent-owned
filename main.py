@@ -43,6 +43,7 @@ def loop(task):
                     print(f"Finished: {args.get('summary', '(none)')}")
                     break
                 fn = TOOLS.get(call["function"]["name"])
+                print(f"Step {i + 1}: Calling tool: {call['function']['name']} with args: {args}")
                 if not fn:
                     result = f"Unknown tool: {call['function']['name']}"
                 else:
@@ -51,8 +52,9 @@ def loop(task):
                     except Exception as e:
                         result = f"Tool call error: {e}"
                 messages.append({"role": "tool", "tool_call_id": call["id"], "content": str(result)})
+                print(f"Step {i + 1}: Tool call result: {result[:2000]}")
         else:
-            print(f"Response: {response['content']}")
+            print(f"Step {i + 1}: Response: {response['content']}")
         i += 1
     if state == "error":
         print("Aborted due to LLM error.")
