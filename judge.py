@@ -54,6 +54,8 @@ def meets_thresholds(fields: dict, thresholds: dict) -> bool:
 
 def judge(run):
     thresholds = parse_thresholds(run["goal"])
+    if not thresholds:
+        return {"correct": False, "reason": "no parseable thresholds in goal"}
     candidates = extract_fields(run["collected"])
     last_reason = "no rows collected"
     # Gate passes if ANY single row clears every threshold on its own.
