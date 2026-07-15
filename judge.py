@@ -31,14 +31,20 @@ def to_number(num):
         return float(s)
     return None
 
-def extract_fields(data: list[dict]) -> dict:
-    fields = {}
-    for review_count, rating in [(r.get("review_count"), r.get("rating")) for r in data]:
+def extract_fields(data: list[dict]) -> list[dict]:
+    # One candidate per row, index-aligned to data. No merge: each row is
+    # judged whole so a strong row can't be clobbered by a weak later row.
+    candidates = []
+    for row in data:
+        fields = {}
+        review_count = row.get("review_count")
+        rating = row.get("rating")
         if review_count is not None:
             fields["review_count"] = to_number(review_count)
         if rating is not None:
             fields["rating"] = to_number(rating)
-    return fields
+        candidates.append(fields)
+    return candidates
 
 def meets_thresholds(fields: dict, thresholds: dict) -> bool:
     for key, threshold in thresholds.items():
@@ -48,12 +54,21 @@ def meets_thresholds(fields: dict, thresholds: dict) -> bool:
 
 def judge(run):
     thresholds = parse_thresholds(run["goal"])
-    fields = extract_fields(run["collected"])
-    for name, minval in thresholds.items():
-        got = fields.get(name)
-        if got is None:   return {"correct": False, "reason": f"no {name}"}
-        if got < minval:  return {"correct": False, "reason": f"{name} {got:g} < {minval:g}"}
-    return {"correct": True, "reason": "gate passed"}
+    candidates = extract_fields(run["collected"])
+    last_reason = "no rows collected"
+    # Gate passes if ANY single row clears every threshold on its own.
+    for i, fields in enumerate(candidates):
+        reason = None
+        for name, minval in thresholds.items():
+            got = fields.get(name)
+            if got is None:
+                reason = f"no {name}"; break
+            if got < minval:
+                reason = f"{name} {got:g} < {minval:g}"; break
+        if reason is None:
+            return {"correct": True, "reason": "gate passed", "winner": i}
+        last_reason = reason
+    return {"correct": False, "reason": last_reason}
 
 def judge_runs(system_prompt, user_prompt):
     response = requests.post(
@@ -114,12 +129,12 @@ def full_judge(run):
     if not gate["correct"]:
         return {"pass": False, "reason": gate["reason"]}
 
+    # Only the winning row's identity reaches layer 2 — the LLM judges the row
+    # that actually cleared the gate, not the accessory that rode alongside it.
     # Strip numbers before they ever reach the LLM. Whitelist = default-deny:
     # only JUDGMENT_FIELDS survive, so review_count/rating cannot leak.
-    stripped = [
-        {k: row[k] for k in JUDGMENT_FIELDS if k in row}
-        for row in run["collected"]
-    ]
+    winner = run["collected"][gate["winner"]]
+    stripped = {k: winner[k] for k in JUDGMENT_FIELDS if k in winner}
     # Goal text still holds the threshold numbers ("200 reviews"), on purpose.
     # Not a leak: the LLM has no collected numbers to compare them against, so it
     # can't recheck arithmetic. And relevance judging needs to know what was asked.
@@ -135,5 +150,8 @@ def full_judge(run):
 
 if __name__ == "__main__":
     run = {"goal": " >=200 reviews and >=4.5 stars",
-       "collected": [{"review_count": "18.2K", "rating": 4.6, "source_url": "amazon.ca/dp/X"}]}
-    print(full_judge(run))
+       "collected": [
+           {"review_count": "18.2K", "rating": 4.6, "source_url": "amazon.ca/dp/PRODUCT"},
+           {"review_count": 50, "rating": 4.9, "source_url": "amazon.ca/dp/ACCESSORY"},
+       ]}
+    print(judge(run))
