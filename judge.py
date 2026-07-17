@@ -125,9 +125,31 @@ JUDGE_SYSTEM_PROMPT_R9 = (
     "Output nothing outside the JSON."
 )
 
+def provenance_filter(run):
+    if not run.get("collected"):
+        return {"pass": False, "reason": "no rows collected"}
+
+    raw = run.get("collected_raw", "")
+    survivors = []
+    for row in run["collected"]:
+        values = [row[k] for k in ("review_count", "rating") if k in row]
+        grounded = all(str(value) in raw for value in values)
+        if grounded:
+            survivors.append(row)
+    if not survivors:
+        return {"pass": False, "reason": "all rows hallucinated"}
+    # No mutation: hand survivors back in the result dict. The caller builds a
+    # fresh run from them, so run["collected"] here stays untouched.
+    return {"pass": True, "reason": f"{len(survivors)} rows grounded in raw text",
+            "survivors": survivors}
+
 def full_judge(run):
+    prov = provenance_filter(run)
+    if not prov["pass"]: return prov
+    # Gate a clone carrying only the grounded rows — never mutate the caller's run.
+    judged = {**run, "collected": prov["survivors"]}
     # Layer 1: deterministic numeric gate. If numbers fail, done — no LLM, no cost.
-    gate = judge(run)
+    gate = judge(judged)
     if not gate["correct"]:
         return {"pass": False, "reason": gate["reason"]}
 
@@ -135,7 +157,7 @@ def full_judge(run):
     # that actually cleared the gate, not the accessory that rode alongside it.
     # Strip numbers before they ever reach the LLM. Whitelist = default-deny:
     # only JUDGMENT_FIELDS survive, so review_count/rating cannot leak.
-    winner = run["collected"][gate["winner"]]
+    winner = judged["collected"][gate["winner"]]
     stripped = {k: winner[k] for k in JUDGMENT_FIELDS if k in winner}
     # Goal text still holds the threshold numbers ("200 reviews"), on purpose.
     # Not a leak: the LLM has no collected numbers to compare them against, so it
@@ -155,5 +177,26 @@ if __name__ == "__main__":
        "collected": [
            {"review_count": "18.2K", "rating": 4.6, "source_url": "amazon.ca/dp/PRODUCT"},
            {"review_count": 50, "rating": 4.9, "source_url": "amazon.ca/dp/ACCESSORY"},
-       ]}
-    print(judge(run))
+       ],
+       "collected_raw": (
+           "ErgoDesk Pro Standing Desk Converter\n"
+           "Visit the ErgoDesk Store\n"
+           "4.6 out of 5 stars\n"
+           "18.2K global ratings\n"
+           "Price: $289.00  In stock, ships from and sold by ErgoDesk\n"
+           "Height-adjustable riser, holds up to two monitors."
+       )}
+    # Case A — mixed run (PRODUCT grounded, ACCESSORY fake)
+    result = provenance_filter(run)
+    print(result)                                        # expect pass: True, "1 rows grounded"
+    print([r["source_url"] for r in result["survivors"]])  # expect ONLY .../PRODUCT
+    print([r["source_url"] for r in run["collected"]])      # unchanged: BOTH rows (no mutation)
+
+    # Case B — all hallucinated (numbers absent from collected_raw)
+    fake_run = {"goal": " >=200 reviews and >=4.5 stars",
+       "collected": [
+           {"review_count": 999, "rating": 3.1, "source_url": "amazon.ca/dp/PRODUCT"},
+           {"review_count": "7.7K", "rating": 3.3, "source_url": "amazon.ca/dp/ACCESSORY"},
+       ],
+       "collected_raw": run["collected_raw"]}   # same page text; these numbers aren't in it
+    print(provenance_filter(fake_run))                   # expect pass: False, "all rows hallucinated"
