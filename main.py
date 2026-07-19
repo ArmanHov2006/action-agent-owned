@@ -11,6 +11,13 @@ MAX_STEPS = 20
 TOOLS = {"httpGet": httpGet, askUser.__name__: askUser}
 
 
+def collected_raw_from(messages):
+    # Provenance source for judge Layer 0. ONLY role:"tool" content — the real
+    # bytes a tool fetched. Assistant messages are the model's own claims and are
+    # excluded, so a number the model invents can never ground itself.
+    return "\n".join(m["content"] for m in messages if m.get("role") == "tool")
+
+
 def loop(task):
     state = "in_progress"
     i = 0
@@ -62,6 +69,14 @@ def loop(task):
         print("Max steps reached without completing the task.")
     else:
         print("Task completed successfully.")
+
+    # Hand judge a run: goal + provenance-safe page text. Structured `collected`
+    # rows come from a later extraction piece; raw text is wired now.
+    return {
+        "goal": task,
+        "collected": [],
+        "collected_raw": collected_raw_from(messages),
+    }
 
 if __name__ == "__main__":
     loop("Ask me which GitHub username to look up. Then fetch https://api.github.com/users/ followed by that username, and tell me their name, bio, and public repo count, then finish.")
