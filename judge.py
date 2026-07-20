@@ -125,6 +125,12 @@ JUDGE_SYSTEM_PROMPT_R9 = (
     "Output nothing outside the JSON."
 )
 
+def _grounded_in(value, raw):
+    # Plain "in" substring check lets "50" match inside "150". Require the
+    # number not be flanked by more digits, so it can't hide inside a longer one.
+    pattern = r"(?<!\d)" + re.escape(str(value)) + r"(?!\d)"
+    return re.search(pattern, raw) is not None
+
 def provenance_filter(run):
     if not run.get("collected"):
         return {"pass": False, "reason": "no rows collected"}
@@ -133,7 +139,7 @@ def provenance_filter(run):
     survivors = []
     for row in run["collected"]:
         values = [row[k] for k in ("review_count", "rating") if k in row]
-        grounded = all(str(value) in raw for value in values)
+        grounded = all(_grounded_in(value, raw) for value in values)
         if grounded:
             survivors.append(row)
     if not survivors:
