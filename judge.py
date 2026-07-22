@@ -131,16 +131,25 @@ def _grounded_in(value, raw):
     pattern = r"(?<!\d)" + re.escape(str(value)) + r"(?!\d)"
     return re.search(pattern, raw) is not None
 
+def domain_of(url):
+    if url.startswith("https://"):
+        url = url[8:]
+    if url.startswith("http://"):
+        url = url[7:]
+    url = url.split("/")[0]
+    return url
+
 def provenance_filter(run):
     if not run.get("collected"):
         return {"pass": False, "reason": "no rows collected"}
 
+    page_url = run.get("page_url", "")
     raw = run.get("collected_raw", "")
     survivors = []
     for row in run["collected"]:
         values = [row[k] for k in ("review_count", "rating") if k in row]
         grounded = all(_grounded_in(value, raw) for value in values)
-        if grounded:
+        if grounded and domain_of(row["source_url"]) == domain_of(page_url):
             survivors.append(row)
     if not survivors:
         return {"pass": False, "reason": "all rows hallucinated"}
