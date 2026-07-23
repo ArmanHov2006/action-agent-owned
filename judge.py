@@ -72,7 +72,7 @@ def judge(run):
         last_reason = reason
     return {"correct": False, "reason": last_reason}
 
-def judge_runs(system_prompt, user_prompt):
+def judge_runs(system_prompt, user_prompt, model="gpt-4o-mini"):
     response = requests.post(
         "https://api.openai.com/v1/chat/completions",
                 headers={
@@ -80,7 +80,7 @@ def judge_runs(system_prompt, user_prompt):
                     "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
                 },
                 json={
-                    "model": "gpt-4o-mini",
+                    "model": model,
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
@@ -158,7 +158,7 @@ def provenance_filter(run):
     return {"pass": True, "reason": f"{len(survivors)} rows grounded in raw text",
             "survivors": survivors}
 
-def full_judge(run):
+def full_judge(run, model="gpt-4o-mini"):
     prov = provenance_filter(run)
     if not prov["pass"]: return prov
     # Gate a clone carrying only the grounded rows — never mutate the caller's run.
@@ -180,11 +180,58 @@ def full_judge(run):
     user_prompt = f"Goal: {run['goal']}\nCollected data: {stripped}"
 
     # Layer 2: LLM judges identity + relevance only. Returns a JSON string.
-    raw = judge_runs(JUDGE_SYSTEM_PROMPT_R9, user_prompt)
+    raw = judge_runs(JUDGE_SYSTEM_PROMPT_R9, user_prompt, model=model)
     verdict = json.loads(raw)
 
     # Final: gate already passed here, so overall pass hinges on the LLM verdict.
     return {"pass": bool(verdict["pass"]), "reason": verdict["reason"]}
+
+
+def judge_reliability(dataset, model_b):
+    agree = 0
+    disagreements = []
+    for item in dataset:
+        run = item["run"]
+        a = full_judge(run)                    # judge-A, default model
+        b = full_judge(run, model=model_b)     # judge-B, injected model
+        if a["pass"] == b["pass"]:
+            agree += 1
+        else:
+            disagreements.append({
+                "run": run,
+                "a": a,                         # keep full verdict, not just bool — reason is evidence
+                "b": b,
+            })
+    total = len(dataset)
+    rate = agree / total if total else 0.0     # empty dataset: decide — 0.0 or fail-closed?
+    return {"agreement_rate": rate, "disagreements": disagreements}
+
+
+def reliability_report(result, model_a="gpt-4o-mini", model_b=None):
+    # Turn judge_reliability's output into a markdown failure-modes writeup.
+    # The disagreements list IS the writeup; this just formats it.
+    lines = []
+    lines.append("# Judge reliability report")
+    lines.append("")
+    lines.append(f"- Judge A: `{model_a}`")
+    if model_b:
+        lines.append(f"- Judge B: `{model_b}`")
+    lines.append(f"- Agreement rate: {result['agreement_rate']:.0%}")
+    lines.append(f"- Disagreements: {len(result['disagreements'])}")
+    lines.append("")
+    if not result["disagreements"]:
+        lines.append("No disagreements. Either the judges are aligned or the "
+                     "dataset never reached layer 2.")
+        return "\n".join(lines)
+    lines.append("## Disagreements (where A and B split)")
+    for i, d in enumerate(result["disagreements"], 1):
+        goal = d["run"].get("goal", "(no goal)")
+        lines.append("")
+        lines.append(f"### {i}. {goal.strip()}")
+        lines.append(f"- A ({model_a}): pass={d['a']['pass']} — {d['a']['reason']}")
+        b_model = model_b or "model_b"
+        lines.append(f"- B ({b_model}): pass={d['b']['pass']} — {d['b']['reason']}")
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":
