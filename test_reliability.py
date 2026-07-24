@@ -85,3 +85,36 @@ def test_kappa_single_class_is_nan():
     # value is nan, not 1.0 — there's no variance to chance-correct, so claiming
     # perfect agreement would be a lie.
     assert math.isnan(judge.cohen_kappa([[5, 0], [0, 0]]))
+
+
+def _run_reaching_llm(tag):
+    # Clears provenance + numeric gate so the decision lands on layer 2. The tag
+    # rides in source_url -> into the LLM user_prompt -> lets the mock decide.
+    return {"run": {
+        "goal": ">=200 reviews and >=4.5 stars",
+        "collected": [{"review_count": 250, "rating": 4.7,
+                       "source_url": f"amazon.ca/dp/{tag}"}],
+        "collected_raw": "250 reviews\n4.7 out of 5 stars",
+        "page_url": f"amazon.ca/dp/{tag}",
+    }}
+
+
+def test_reliability_tally_perfect_agreement_kappa(monkeypatch):
+    # The lock on the tally. 2 runs where both judges PASS + 2 where both FAIL ->
+    # matrix [[2,0],[0,2]] -> kappa == 1.0. The old garbage line
+    # cohen_kappa([pair for pair in pairs]) can't produce this: on 4 pairs it
+    # IndexErrors (treats 4 tuples as a 4x4 matrix). So this test goes red on the
+    # bug and green only on a real tally.
+    def fake_judge_runs(system_prompt, user_prompt, model="gpt-4o-mini"):
+        passed = "PASS" in user_prompt          # tag carried via source_url
+        return json.dumps({"pass": passed, "reason": "ok" if passed else "bad"})
+
+    monkeypatch.setattr(judge, "judge_runs", fake_judge_runs)
+
+    dataset = [_run_reaching_llm("PASS1"), _run_reaching_llm("PASS2"),
+               _run_reaching_llm("FAIL1"), _run_reaching_llm("FAIL2")]
+    result = judge.judge_reliability(dataset, model_b="gpt-4o")
+
+    # Both judges agree on every run (mock ignores model), so kappa is perfect.
+    assert result["agreement_rate"] == 1.0
+    assert result["kappa"] == 1.0

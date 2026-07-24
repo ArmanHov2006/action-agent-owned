@@ -190,21 +190,23 @@ def full_judge(run, model="gpt-4o-mini"):
 def judge_reliability(dataset, model_b):
     agree = 0
     disagreements = []
+    pairs = []                              # 1. start an empty list, before the loop
     for item in dataset:
         run = item["run"]
-        a = full_judge(run)                    # judge-A, default model
-        b = full_judge(run, model=model_b)     # judge-B, injected model
+        a = full_judge(run)
+        b = full_judge(run, model=model_b)
+        pairs.append((a["pass"], b["pass"]))    # 2. append the (A pass, B pass) tuple each loop
         if a["pass"] == b["pass"]:
             agree += 1
         else:
-            disagreements.append({
-                "run": run,
-                "a": a,                         # keep full verdict, not just bool — reason is evidence
-                "b": b,
-            })
+            disagreements.append({"run": run, "a": a, "b": b})
     total = len(dataset)
-    rate = agree / total if total else 0.0     # empty dataset: decide — 0.0 or fail-closed?
-    return {"agreement_rate": rate, "disagreements": disagreements}
+    rate = agree / total if total else 0.0
+    m = [[0, 0], [0, 0]]
+    for (av, bv) in pairs:
+        m[0 if av else 1][0 if bv else 1] += 1
+    kappa = cohen_kappa(m)  # 3. tally pairs → 2×2 (grammar above), then cohen_kappa(that)
+    return {"agreement_rate": rate, "disagreements": disagreements, "kappa": kappa}
 
 
 def reliability_report(result, model_a="gpt-4o-mini", model_b=None):
