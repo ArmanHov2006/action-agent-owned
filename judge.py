@@ -262,3 +262,15 @@ if __name__ == "__main__":
        ],
        "collected_raw": run["collected_raw"]}   # same page text; these numbers aren't in it
     print(provenance_filter(fake_run))                   # expect pass: False, "all rows hallucinated"
+
+def cohen_kappa(confusion_matrix):
+    total = sum(sum(row) for row in confusion_matrix)
+    if total == 0:
+        return 0.0
+    p_o = sum(confusion_matrix[i][i] for i in range(len(confusion_matrix))) / total
+    row_sums = [sum(row) for row in confusion_matrix]
+    col_sums = [sum(confusion_matrix[i][j] for i in range(len(confusion_matrix))) for j in range(len(confusion_matrix[0]))]
+    p_e = sum((row_sums[i] * col_sums[i]) for i in range(len(row_sums))) / (total ** 2)
+    if p_e == 1:
+        return float('nan')     # kappa undefined: one class only, no chance floor to correct
+    return (p_o - p_e) / (1 - p_e)

@@ -1,4 +1,5 @@
 import json
+import math
 import judge
 
 
@@ -74,3 +75,13 @@ def test_empty_dataset_does_not_divide_by_zero():
     result = judge.judge_reliability([], model_b="gpt-4o")
     assert result["agreement_rate"] == 0.0
     assert result["disagreements"] == []
+
+def test_kappa_known_value():
+    result = judge.cohen_kappa([[60, 7], [3, 30]])
+    assert abs(result - 0.781) < 1e-3
+
+def test_kappa_single_class_is_nan():
+    # Every observation in one cell: p_e == 1, kappa is 0/0 undefined. Honest
+    # value is nan, not 1.0 — there's no variance to chance-correct, so claiming
+    # perfect agreement would be a lie.
+    assert math.isnan(judge.cohen_kappa([[5, 0], [0, 0]]))
