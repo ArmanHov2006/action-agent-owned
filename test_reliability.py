@@ -118,3 +118,46 @@ def test_reliability_tally_perfect_agreement_kappa(monkeypatch):
     # Both judges agree on every run (mock ignores model), so kappa is perfect.
     assert result["agreement_rate"] == 1.0
     assert result["kappa"] == 1.0
+
+def test_kappa_ci_brackets_point_estimate(monkeypatch):
+    # The lock on the tally. 2 runs where both judges PASS + 2 where both FAIL ->
+    # matrix [[2,0],[0,2]] -> kappa == 1.0. The old garbage line
+    # cohen_kappa([pair for pair in pairs]) can't produce this: on 4 pairs it
+    # IndexErrors (treats 4 tuples as a 4x4 matrix). So this test goes red on the
+    # bug and green only on a real tally.
+    def fake_judge_runs(system_prompt, user_prompt, model="gpt-4o-mini"):
+        passed = "PASS" in user_prompt          # tag carried via source_url
+        return json.dumps({"pass": passed, "reason": "ok" if passed else "bad"})
+
+    monkeypatch.setattr(judge, "judge_runs", fake_judge_runs)
+
+    dataset = [_run_reaching_llm("PASS1"), _run_reaching_llm("PASS2"),
+               _run_reaching_llm("FAIL1"), _run_reaching_llm("FAIL2")]
+    result = judge.judge_reliability(dataset, model_b="gpt-4o")
+
+    # Both judges agree on every run (mock ignores model), so kappa is perfect.
+    assert result["agreement_rate"] == 1.0
+    assert result["kappa"] == 1.0
+
+    lower, upper = judge.kappa_bootstrap_ci(result["pairs"], n=10000, seed=42)
+    assert lower <= result["kappa"] <= upper
+
+
+def test_kappa_ci_raises_on_single_class(monkeypatch):
+    def fake_judge_runs(system_prompt, user_prompt, model="gpt-4o-mini"):
+        return json.dumps({"pass": True, "reason": "ok"})
+
+    monkeypatch.setattr(judge, "judge_runs", fake_judge_runs)
+
+    dataset = [_run_reaching_llm("PASS1"), _run_reaching_llm("PASS2"),
+               _run_reaching_llm("PASS3"), _run_reaching_llm("PASS4")]
+    result = judge.judge_reliability(dataset, model_b="gpt-4o")
+
+    assert result["agreement_rate"] == 1.0
+    assert math.isnan(result["kappa"])
+
+    try:
+        lower, upper = judge.kappa_bootstrap_ci(result["pairs"], n=10000, seed=42)
+        assert False, "Expected ValueError for no valid kappa values"
+    except ValueError as e:
+        assert str(e) == "No valid kappa values to compute confidence interval."

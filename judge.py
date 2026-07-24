@@ -1,8 +1,10 @@
 import os
 import re
+import math
 import json
 import requests
 from dotenv import load_dotenv
+import random
 
 JUDGMENT_FIELDS = {"source_url"}   # whitelist: only these keys reach the LLM
 
@@ -206,8 +208,7 @@ def judge_reliability(dataset, model_b):
     for (av, bv) in pairs:
         m[0 if av else 1][0 if bv else 1] += 1
     kappa = cohen_kappa(m)  # 3. tally pairs → 2×2 (grammar above), then cohen_kappa(that)
-    return {"agreement_rate": rate, "disagreements": disagreements, "kappa": kappa}
-
+    return {"agreement_rate": rate, "disagreements": disagreements, "kappa": kappa, "pairs": pairs}
 
 def reliability_report(result, model_a="gpt-4o-mini", model_b=None):
     # Turn judge_reliability's output into a markdown failure-modes writeup.
@@ -238,6 +239,7 @@ def reliability_report(result, model_a="gpt-4o-mini", model_b=None):
 
 if __name__ == "__main__":
     run = {"goal": " >=200 reviews and >=4.5 stars",
+       "page_url": "amazon.ca/dp/PRODUCT",
        "collected": [
            {"review_count": "18.2K", "rating": 4.6, "source_url": "amazon.ca/dp/PRODUCT"},
            {"review_count": 50, "rating": 4.9, "source_url": "amazon.ca/dp/ACCESSORY"},
@@ -276,3 +278,30 @@ def cohen_kappa(confusion_matrix):
     if p_e == 1:
         return float('nan')     # kappa undefined: one class only, no chance floor to correct
     return (p_o - p_e) / (1 - p_e)
+
+def kappa_bootstrap_ci(pairs, n=10000, seed=None):
+
+    if seed is not None:
+        random.seed(seed)
+    kappa_values = []
+    for _ in range(n):
+        sample = [random.choice(pairs) for _ in range(len(pairs))]
+        m = [[0, 0], [0, 0]]
+        for (av, bv) in sample:
+            m[0 if av else 1][0 if bv else 1] += 1
+        kappa_values.append(cohen_kappa(m))
+    kappa_values = [k for k in kappa_values if not math.isnan(k)]  # drop nans (undefined-kappa samples)
+    kappa_values.sort()
+    if not kappa_values: raise ValueError("No valid kappa values to compute confidence interval.")
+    index_lo = int(0.025 * len(kappa_values))
+    index_hi = int(0.975 * len(kappa_values))
+    return kappa_values[index_lo], kappa_values[index_hi]
+
+
+if __name__ == "__main__":
+    pairs = [(1,1),(1,0),(0,0),(1,1),(1,1),(0,0),(1,0),(0,0)]   # any real mix
+    m = [[0, 0], [0, 0]]
+    for (av, bv) in pairs:
+        m[0 if av else 1][0 if bv else 1] += 1
+    lo, hi = kappa_bootstrap_ci(pairs, seed=42)
+    print(f"kappa = {cohen_kappa(m):.2f} [{lo:.2f}, {hi:.2f}]")
