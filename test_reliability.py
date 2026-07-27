@@ -161,3 +161,36 @@ def test_kappa_ci_raises_on_single_class(monkeypatch):
         assert False, "Expected ValueError for no valid kappa values"
     except ValueError as e:
         assert str(e) == "No valid kappa values to compute confidence interval."
+
+def test_reliability_report_handles_undefined_kappa(monkeypatch):
+    # All-PASS single class -> kappa is nan. reliability_report must NOT call
+    # kappa_bootstrap_ci (which raises on no valid kappa values). It must render
+    # an "undefined" line instead of crashing.
+    def fake_judge_runs(system_prompt, user_prompt, model="gpt-4o-mini"):
+        return json.dumps({"pass": True, "reason": "ok"})
+
+    monkeypatch.setattr(judge, "judge_runs", fake_judge_runs)
+
+    dataset = [_run_reaching_llm("PASS1"), _run_reaching_llm("PASS2"),
+               _run_reaching_llm("PASS3"), _run_reaching_llm("PASS4")]
+    result = judge.judge_reliability(dataset, model_b="gpt-4o")
+    assert math.isnan(result["kappa"])
+
+    report = judge.reliability_report(result, model_b="gpt-4o")
+    assert isinstance(report, str)
+    assert "undefined" in report.lower()
+
+def test_reliability_tally(monkeypatch):
+    def fake_judge_runs(system_prompt, user_prompt, model="gpt-4o-mini"):
+        passed = "PASS" in user_prompt          # tag carried via source_url
+        return json.dumps({"pass": passed, "reason": "ok" if passed else "bad"})
+
+    monkeypatch.setattr(judge, "judge_runs", fake_judge_runs)
+
+    dataset = [_run_reaching_llm("PASS1"), _run_reaching_llm("PASS2"),
+               _run_reaching_llm("FAIL1"), _run_reaching_llm("FAIL2")]
+    result = judge.judge_reliability(dataset, model_b="gpt-4o")
+    assert result["agreement_rate"] == 1.0
+    assert result["kappa"] == 1.0
+    report = judge.reliability_report(result, model_a="gpt-4o-mini", model_b="gpt-4o")
+    assert "1.00 [1.00, 1.00]" in report

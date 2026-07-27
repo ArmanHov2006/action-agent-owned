@@ -221,6 +221,14 @@ def reliability_report(result, model_a="gpt-4o-mini", model_b=None):
         lines.append(f"- Judge B: `{model_b}`")
     lines.append(f"- Agreement rate: {result['agreement_rate']:.0%}")
     lines.append(f"- Disagreements: {len(result['disagreements'])}")
+    if math.isnan(result["kappa"]):
+        # Single class (all PASS or all FAIL): p_e == 1, no chance floor to
+        # correct against, so kappa is undefined — not 0, not 1, not missing.
+        lines.append("- kappa: undefined (single class — every judgment agrees "
+                     "one way, no chance baseline to correct against)")
+    else:
+        lo, hi = kappa_bootstrap_ci(result["pairs"], seed = 10)
+        lines.append(f"- kappa: {result['kappa']:.2f} [{lo:.2f}, {hi:.2f}]")
     lines.append("")
     if not result["disagreements"]:
         lines.append("No disagreements. Either the judges are aligned or the "
