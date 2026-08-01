@@ -1,0 +1,13 @@
+{
+  // Owned-lane struggle protocol: autocomplete + AI suggestions OFF.
+  // You type every line. This is the hard precondition — do not re-enable here.
+  "github.copilot.enable": { "*": false },
+  "github.copilot.inlineSuggest.enable": false,
+  "editor.inlineSuggest.enabled": false,
+  "editor.suggestOnTriggerCharacters": false,
+  "editor.quickSuggestions": { "other": false, "comments": false, "strings": false },
+  "editor.tabCompletion": "off",
+  "editor.wordBasedSuggestions": "off",
+  "editor.parameterHints.enabled": false,
+  "editor.acceptSuggestionOnEnter": "off"
+}
